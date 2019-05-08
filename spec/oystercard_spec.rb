@@ -2,9 +2,11 @@ require 'oystercard'
 require 'station'
 
 describe Oystercard do
-  let(:subject) { Oystercard.new }
-  let(:topped_up_card) { Oystercard.new.tap { |card| card.top_up(10)}}
-  let(:start_station) { Station.new }
+
+  def topped_up_card
+    subject.top_up(10)
+    subject.touch_in(:station)
+  end
 
   it 'has 0 balance by default' do
     expect(subject.balance).to eq(0)
@@ -19,44 +21,46 @@ describe Oystercard do
   end
 
   it 'should deduct a value from the total balance' do
-    expect{ topped_up_card.send(:deduct, 5) }.to change{ topped_up_card.balance }.by -5
-  end
-
-  it 'should start not on a journey' do
-    expect(topped_up_card.in_journey).to eq(false)
+    topped_up_card
+    expect{ subject.send(:deduct, 5) }.to change{ subject.balance }.by -5
   end
 
   describe '#touch_in' do
-
-    it 'should start a journey with #touch_in' do
-      expect{ topped_up_card.touch_in(start_station) }.to change{ topped_up_card.in_journey}.to eq(true)
+    
+    it 'should be in journey' do
+      topped_up_card
+      expect(subject.in_journey?).to be true
     end
     it 'should raise an error if there is not enough money in the account' do
-      topped_up_card.send(:deduct, 10)
-      expect { topped_up_card.touch_in(start_station) }.to raise_error("Insufficient funds!")
+      topped_up_card
+      subject.send(:deduct, 10)
+      expect { subject.touch_in(:station) }.to raise_error("Insufficient funds!")
     end
+  end 
     
+  describe 'let' do
+    let(:station) { double :station }
     it 'should record the starting station' do
-      expect{ topped_up_card.touch_in(start_station) }.to change{ topped_up_card.start_station }.to eq start_station
+      subject.top_up(10)
+      subject.touch_in(station)
+      expect(subject.start_station).to eq station
     end
-
   end
 
   describe '#touch_out' do
 
     it 'should end a journey with #touch_out' do
-      topped_up_card.touch_in(start_station)
-      expect{ topped_up_card.touch_out }.to change{ topped_up_card.in_journey}.to eq(false)
+      topped_up_card
+      expect{ subject.touch_out }.to change{ subject.in_journey?}.to eq(false)
     end
 
     it "should deduct a fare at the end of the journey" do
-      topped_up_card.touch_in(start_station)
-      expect{ topped_up_card.touch_out }.to change{ topped_up_card.balance }.by -Oystercard::FARE
+      topped_up_card
+      expect{ subject.touch_out }.to change{ subject.balance }.by -Oystercard::FARE
     end
 
-    it 'should make the card forget the start station' do
-       topped_up_card.touch_in(start_station)
-       expect{ topped_up_card.touch_out }.to change{ topped_up_card.start_station }.to eq nil
+    it 'should not be on a journey' do
+      expect(subject.in_journey?).to eq(false)
     end
 
   end
